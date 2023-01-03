@@ -1,13 +1,11 @@
 import Command.Companion.toCommandOrNull
-import FileSystemNode.Companion.toDirNameOrNull
 import FileSystemNode.Companion.toFileSystemNodeOrNull
-import kotlin.reflect.KClass
 
 sealed interface FileSystemNode {
-    fun size(): Int
+    fun size(): Long
 
     data class Dir(val name: String, val contents: MutableList<FileSystemNode> = mutableListOf()) : FileSystemNode {
-        override fun size(): Int =
+        override fun size(): Long =
             contents.fold(0) { acc, fileSystemNode ->
                 val size = when (fileSystemNode) {
                     is Dir -> fileSystemNode.size()
@@ -17,8 +15,8 @@ sealed interface FileSystemNode {
             }
     }
 
-    data class File(val size: Int) : FileSystemNode {
-        override fun size(): Int = size
+    data class File(val size: Long) : FileSystemNode {
+        override fun size(): Long = size
     }
 
     companion object {
@@ -26,15 +24,8 @@ sealed interface FileSystemNode {
             when {
                 startsWith("dir") -> Dir(takeLastWhile { it != ' ' })
                 startsWith('$') -> null
-                else -> File(takeWhile { it != ' ' }.toInt())
+                else -> File(takeWhile { it != ' ' }.toLong())
             }
-
-        fun String.toDirNameOrNull(): String? =
-            when {
-                startsWith("dir") -> takeLastWhile { it != ' ' }
-                else -> null
-            }
-
     }
 }
 
@@ -55,47 +46,44 @@ sealed interface Command {
 }
 
 fun main() {
-    fun part1(input: List<String>): Int {
-        var currentDirName = ""
+    fun part1(input: List<String>): Long {
+        var currentDir = FileSystemNode.Dir("/")
         return input
-            .fold(mutableMapOf("/" to FileSystemNode.Dir("/"))) { dirs, line ->
+            .fold(mutableListOf(currentDir)) { dirs, line ->
                 when (val command = line.toCommandOrNull()) {
                     Command.CDout -> {
-                        dirs
+                        // do nothing
                     }
 
                     is Command.CDin -> {
-                        currentDirName = command.dirName
-                        dirs
+                        currentDir = dirs.find { it.name == command.dirName }
+                            ?: error("Dir we cd into should have been added already when it was read from ls output")
                     }
 
                     Command.LS -> {
-                        dirs
+                        // do nothing
                     }
 
                     null -> {
                         when (val node = line.toFileSystemNodeOrNull()) {
                             is FileSystemNode.Dir ->
-                                dirs.getValue(currentDirName).contents.add(node)
-                                    .also { dirs[node.name] = node }
+                                currentDir.contents.add(node)
+                                    .also { dirs.add(node) }
 
                             is FileSystemNode.File ->
-                                dirs.getValue(currentDirName).contents.add(node)
+                                currentDir.contents.add(node)
 
                             null ->
                                 error("Every line should either be a command or ls output, but was $line")
                         }
-                        dirs
                     }
                 }
+                dirs
             }
-            .filterValues {
-                it
-                    .also { "Node $it has size ${it.size()}".println() }
-                    .size() <= 100000
+            .filter { dir ->
+                dir.size() <= 100000
             }
-            .values
-            .sumOf { it.size() }
+            .sumOf(FileSystemNode.Dir::size)
     }
 
     fun part2(input: List<String>): Int {
@@ -104,7 +92,7 @@ fun main() {
 
     // test if implementation meets criteria from the description, like:
     val testInput = readInput("Day07_test")
-    check(part1(testInput) == 95437)
+    check(part1(testInput) == 95437.toLong())
 
     val input = readInput("Day07")
     part1(input).println()
