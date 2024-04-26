@@ -15,7 +15,7 @@ sealed interface FileSystemNode {
             }
     }
 
-    data class File(val size: Long) : FileSystemNode {
+    data class File(val name: String, val size: Long) : FileSystemNode {
         override fun size(): Long = size
     }
 
@@ -24,7 +24,10 @@ sealed interface FileSystemNode {
             when {
                 startsWith("dir") -> Dir(takeLastWhile { it != ' ' })
                 startsWith('$') -> null
-                else -> File(takeWhile { it != ' ' }.toLong())
+                else -> {
+                    val (size, name) = split(' ')
+                    File(name, size.toLong())
+                }
             }
     }
 }
@@ -79,6 +82,9 @@ fun main() {
                     }
                 }
                 dirs
+            }.onEach {
+                it.println()
+                it.size().println()
             }
             .filter { dir ->
                 dir.size() <= 100000
